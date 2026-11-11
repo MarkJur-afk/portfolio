@@ -3,7 +3,7 @@
 _old/
 blender_out/
 Claude outputs/
-zombies/
+/zombies/
 # original full-size artwork (the site uses the optimised copies in assets/)
 map.png
 metro.png
