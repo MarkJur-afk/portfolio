@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mark — Developer in the Ruins</title>
+<meta name="description" content="Portfolio of Mark, a developer. Explore four apocalypses, one for each technology.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="stage" aria-label="Interactive map of the ruined world">
+  <div id="world">
+    <img id="map" src="assets/map.jpg" alt="Illustrated map of a ruined city: snowbound quarter, dusty streets, a flooded district and collapsed blocks" draggable="false">
+    <canvas id="fx"></canvas>
+    <div id="markers"></div>
+  </div>
+</div>
+<div id="scene" aria-hidden="true">
+  <div id="sc-zoom">
+    <div id="sc-inner">
+      <img id="sc-img" alt="" draggable="false">
+      <canvas id="sc-fx"></canvas>
+    </div>
+  </div>
+  <div id="sc-shade"></div>
+</div>
+<div id="entering" aria-hidden="true"><small></small><b></b></div>
+<div id="tint"></div>
+<div id="vignette"></div>
+
+<header id="hud">
+  <div class="brand">
+    <h1>MARK</h1>
+    <p>developer · survivor of four apocalypses</p>
+  </div>
+  <nav id="nav" aria-label="Sections">
+    <button data-section="about">About</button>
+    <button data-section="projects">Projects</button>
+    <button data-section="skills">Skills</button>
+    <button data-section="contact">Contact</button>
+  </nav>
+</header>
+
+<button id="back" hidden>← Back to the map</button>
+<button id="info-toggle" hidden aria-controls="panel" aria-expanded="true">Hide panel  ✕</button>
+
+<aside id="panel" aria-live="polite" aria-hidden="true">
+  <button id="close" aria-label="Close panel">✕</button>
+  <div id="panel-body"></div>
+</aside>
+
+<footer id="legend">
+  <span class="hint">drag to explore · scroll to zoom · tap a marker</span>
+  <div id="chips"></div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
