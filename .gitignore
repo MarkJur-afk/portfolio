@@ -1,0 +1,12 @@
+.DS_Store
+# working files, not part of the site
+_old/
+blender_out/
+Claude outputs/
+zombies/
+# original full-size artwork (the site uses the optimised copies in assets/)
+map.png
+metro.png
+regular.png
+water.png
+winter.png
