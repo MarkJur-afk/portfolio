@@ -47,7 +47,7 @@ function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0
 /* ============================================================
    WORLD STATE (what Python / UI can change)
    ============================================================ */
-const state = { time: 'day', lights: false, rain: false, snow: 0.6, birdTarget: 14 };
+const state = { time: 'day', lights: false, rain: false, snow: 0.6, birdTarget: 14, lamp: [255, 205, 120], power: 1, alarm: false };
 const TINTS = { day: 'rgb(255,255,255)', dusk: 'rgb(255,178,140)', night: 'rgb(70,86,140)' };
 const worldAPI = {
   time(mode) {
@@ -58,7 +58,7 @@ const worldAPI = {
   lights(on = true) { state.lights = !!on; },
   rain(on = true) { state.rain = !!on; },
   snow(level) { state.snow = clamp(Number(level), 0, 1); },
-  reset() { Object.assign(state, { time: 'day', lights: false, rain: false, snow: 0.6, birdTarget: 14 }); applyTint(); },
+  reset() { Object.assign(state, { time: 'day', lights: false, rain: false, snow: 0.6, birdTarget: 14, lamp: [255, 205, 120], power: 1, alarm: false }); applyTint(); },
 };
 function applyTint() { $('#tint').style.backgroundColor = TINTS[state.time]; }
 
@@ -362,12 +362,14 @@ function drawScene(t) {
   if (lit > 0.01) {
     sctx.globalCompositeOperation = 'lighter';
     S.lamps.forEach(([fx_, fy_, r], i) => {
-      let a = lit * (0.55 + 0.2 * Math.sin(t * 2.6 + i * 1.7));
+      let a = lit * state.power * (0.55 + 0.2 * Math.sin(t * 2.6 + i * 1.7));
       if (S.alwaysLit && Math.sin(t * 1.1 + i * 5.3) > 0.965) a *= 0.2;   // failing bulbs
+      let [cr, cg, cb] = state.lamp;
+      if (state.alarm && S.alwaysLit) { const p = 0.5 + 0.5 * Math.sin(t * 6); cr = 255; cg = 40 + 30 * p; cb = 30; a *= 0.5 + 0.9 * p; }
       const x = fx_ * IW, y = fy_ * IH;
-      const g = sctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgba(255,205,120,${a})`); g.addColorStop(0.35, `rgba(255,170,80,${a * 0.35})`); g.addColorStop(1, 'rgba(255,140,50,0)');
-      sctx.fillStyle = g; sctx.beginPath(); sctx.arc(x, y, r, 0, 6.28); sctx.fill();
+      const g = sctx.createRadialGradient(x, y, 0, x, y, r * (state.alarm && S.alwaysLit ? 1.5 : 1));
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},${a})`); g.addColorStop(0.35, `rgba(${cr},${cg * 0.83 | 0},${cb * 0.67 | 0},${a * 0.35})`); g.addColorStop(1, `rgba(${cr},${cg * 0.7 | 0},${cb * 0.4 | 0},0)`);
+      sctx.fillStyle = g; sctx.beginPath(); sctx.arc(x, y, r * (state.alarm && S.alwaysLit ? 1.5 : 1), 0, 6.28); sctx.fill();
     });
     sctx.globalCompositeOperation = 'source-over';
   }
@@ -383,8 +385,8 @@ function drawScene(t) {
    ENTER / LEAVE A LOCATION  (the "pull")
    ============================================================ */
 /* ---------- zombies: one sprite per row of the `zombies` table ---------- */
-const ZKINDS = [{name:"drifter",frames:5,w:274,h:340}, {name:"lady",frames:5,w:266,h:338}, {name:"cop",frames:5,w:270,h:342}, {name:"builder",frames:5,w:268,h:346}, {name:"soldier",frames:5,w:278,h:342}, {name:"trapper",frames:5,w:270,h:342}, {name:"medic",frames:5,w:290,h:342}, {name:"brute",frames:5,w:290,h:356}, {name:"clerk",frames:5,w:270,h:338}, {name:"kid",frames:5,w:246,h:314}, {name:"walker",frames:3,w:396,h:357}];                              // [{name, frames, w, h}] — sprites live in assets/zombies/<name>_<frame>.webp
-const ZREF_H = ZKINDS[0].h;
+const ZKINDS = [{name:"drifter",frames:16,w:243,h:360}, {name:"lady",frames:16,w:229,h:356}, {name:"cop",frames:16,w:228,h:362}, {name:"builder",frames:16,w:233,h:366}, {name:"soldier",frames:16,w:238,h:359}, {name:"trapper",frames:16,w:232,h:360}, {name:"medic",frames:16,w:231,h:360}, {name:"brute",frames:16,w:264,h:380}, {name:"clerk",frames:16,w:233,h:358}, {name:"kid",frames:16,w:188,h:317}, {name:"walker",frames:16,w:313,h:381}];                              // [{name, frames, w, h}] — sprites live in assets/zombies/<name>_<frame>.webp
+const ZREF_H = 342;   // body height of the reference sprite (sprites are cropped tightly, so this keeps the scale)
 const zKindByName = Object.fromEntries(ZKINDS.map(k => [k.name, k]));
 for (const k of ZKINDS) k.imgs = Array.from({ length: k.frames }, (_, i) => { const im = new Image(); im.src = `assets/zombies/${k.name}_${i}.webp`; return im; });
 const ZMAX = 5;                                        // the swamp never holds more than this
@@ -500,7 +502,7 @@ function drawZombies(t) {
     if (bodyC.width !== iw || bodyC.height !== ih) { bodyC.width = iw; bodyC.height = ih; }
     bodyX.globalCompositeOperation = 'source-over'; bodyX.globalAlpha = 1; bodyX.clearRect(0, 0, iw, ih);
     bodyX.drawImage(img, 0, 0);
-    if (moving && f > 0.03) { bodyX.globalAlpha = f; bodyX.drawImage(img2, 0, 0); bodyX.globalAlpha = 1; }
+    if (moving && f > 0.03 && n < 8) { bodyX.globalAlpha = f; bodyX.drawImage(img2, 0, 0); bodyX.globalAlpha = 1; }
     bodyX.globalCompositeOperation = 'source-atop';
     const tg = bodyX.createLinearGradient(0, 0, 0, ih); tg.addColorStop(0, 'rgba(20,42,55,.2)'); tg.addColorStop(1, 'rgba(8,38,48,.5)');
     bodyX.fillStyle = tg; bodyX.fillRect(0, 0, iw, ih);
@@ -585,7 +587,7 @@ async function enterZone(id) {
 async function leaveZone(quick = false) {
   if (mode !== 'scene' && !quick) return;
   busy = true; mode = 'leaving';
-  hidePanel();
+  hidePanel(); if (zoneCleanup) { zoneCleanup(); zoneCleanup = null; }
   backBtn.hidden = true; infoBtn.hidden = true;
   document.body.classList.remove('in-scene', 'immersive');
   const z = current;
@@ -696,31 +698,36 @@ addEventListener('keydown', e => {
 const SECTIONS = {
   about: () => `
     <p class="kicker">About</p><h2>Hi, I'm Mark.</h2>
-    <p>I'm a developer. This whole site is a map of the world after the end — and every region of it is a technology I actually work with.</p>
-    <p class="note">[ Placeholder — replace with a short bio: who you are, what you build, what you're looking for. ]</p>
+    <p>I started programming because I love to create things and see the result come alive. For two years now I've been building small projects, from web apps to APIs, and every one of them taught me something new.</p>
+    <p class="note">I'm at the beginning of the road, and I know it. What I bring is curiosity, patience and the habit of finishing what I start, and I'm always ready to learn.</p>
     <h3>How to read this site</h3>
     <p>Four apocalypses, four languages. Pick a marker on the map and the camera pulls you into that place. Each one lets you try the tech yourself, right here in the browser.</p>`,
   projects: () => `
     <p class="kicker">Projects</p><h2>Artifacts found</h2>
-    <p>Every project is an object left behind somewhere in the world. Soon you'll be able to travel between regions and pick them up.</p>
+    <p>Every project is an object left behind somewhere in the world. Open one to see the code.</p>
     <div class="cards">
-      <div class="card"><b>[ Project name #1 ]</b><small>Short description · stack · link</small></div>
-      <div class="card"><b>[ Project name #2 ]</b><small>Short description · stack · link</small></div>
-      <div class="card"><b>[ Project name #3 ]</b><small>Short description · stack · link</small></div>
+      <a class="card" href="https://github.com/MarkJur-afk/FunktsUurimine" target="_blank" rel="noopener"><b>FunktsUurimine</b><p>A web app that investigates a mathematical function: type a formula like <code>x^2-6*x+9</code> and get its derivative, zeros, extrema and a plotted graph.</p><small>C# · ASP.NET Core MVC (.NET 8) · SQLite</small></a>
+      <a class="card" href="https://github.com/MarkJur-afk/JWT-Mini-API" target="_blank" rel="noopener"><b>JWT Mini-API</b><p>A small learning API that shows how token authentication works: log in, get a signed token, reach protected endpoints, and see 401 and 403 for the wrong visitors.</p><small>Python · Flask · PyJWT</small></a>
+      <a class="card" href="https://github.com/MarkJur-afk/CityExplorer" target="_blank" rel="noopener"><b>CityExplorer</b><p>A project about exploring a city. The full story lives in the repository.</p><small>GitHub</small></a>
     </div>`,
   skills: () => `
     <p class="kicker">Skills &amp; experience</p><h2>Territories</h2>
-    <p>Tap a region to be pulled in.</p>
+    <p>Two years of hands-on practice, learning fastest by building. Tap a region to be pulled in.</p>
     <div class="stack">${ZONES.map(z => `<button data-zone="${z.id}">${z.lang}</button>`).join('')}</div>
-    <h3>Experience</h3>
-    <p class="note">[ Placeholder — roles, companies, years, one line each. ]</p>`,
+    <h3>Where I'm at</h3>
+    <ul>
+      <li><b>Python</b> — Flask, JWT authentication, small APIs.</li>
+      <li><b>C#</b> — ASP.NET Core MVC on .NET 8, working with a database.</li>
+      <li><b>SQL</b> — SQLite: tables, queries, migrations.</li>
+      <li><b>JS / HTML / CSS</b> — this very site.</li>
+    </ul>
+    <p class="note">Beginner level, honestly. Always ready to learn, and to get better with every project.</p>`,
   contact: () => `
     <p class="kicker">Contact</p><h2>Send a signal</h2>
     <p>Radio's on. I read everything.</p>
     <ul>
-      <li>Email — <span class="note">[ your@email.com ]</span></li>
-      <li>GitHub — <span class="note">[ github.com/your-handle ]</span></li>
-      <li>LinkedIn — <span class="note">[ linkedin.com/in/your-handle ]</span></li>
+      <li>Email — <a href="mailto:markjurgennn@gmail.com">markjurgennn@gmail.com</a></li>
+      <li>GitHub — <a href="https://github.com/MarkJur-afk" target="_blank" rel="noopener">github.com/MarkJur-afk</a></li>
     </ul>`,
 };
 $('#nav').addEventListener('click', async e => {
@@ -766,15 +773,40 @@ for n in range(3):
     <h2>Everything is buried in snow</h2>
     <p>A quiet, endless snowfall. The lantern is dark and waiting for someone to write the code that lights it.</p>
     <div class="slider"><span>Snowfall</span><input id="snow-range" type="range" min="0" max="100" value="${Math.round(state.snow * 100)}" aria-label="Snowfall intensity"><span id="snow-val">${Math.round(state.snow * 100)}%</span></div>
-    <p><span class="soon">next: in-browser C# console</span></p>
-    <p class="note">Plan: a real .NET runtime in the page (Blazor WebAssembly) so you can write a small C# class and light the lantern.</p>`,
+    <div class="term">
+      <div class="term-bar"><span>Lantern.cs</span><span id="cs-status">ready</span></div>
+      <textarea id="cs-code" spellcheck="false" aria-label="C# code"></textarea>
+      <pre id="cs-out" aria-live="polite">Run the code (Ctrl/Cmd + Enter).</pre>
+    </div>
+    <div class="row"><button class="btn" id="cs-run">▶ Run</button><button class="btn ghost" id="cs-reset">Reset code</button><button class="btn ghost" id="cs-world">Reset world</button></div>
+    <h3>What it understands</h3>
+    <p>Classes, methods, properties, <code>List&lt;T&gt;</code>, arrays, loops, <code>$"interpolation"</code>, <code>try/catch</code>, <code>Console</code>, <code>Math</code>, <code>Random</code>. The village is yours through <code>World</code>:</p>
+    <ul>
+      <li><code>World.Lights(true)</code> lights the lantern</li>
+      <li><code>World.Time("night")</code> day, dusk or night</li>
+      <li><code>World.Snow(0.8)</code> snowfall 0 to 1</li>
+      <li><code>World.Birds(10)</code>, <code>World.Rain(true)</code></li>
+    </ul>
+    <p class="note">Honest note: this is a small C# interpreter written for this site, not the full .NET runtime. No LINQ or <code>Dictionary</code>, and integer division works like in JavaScript.</p>`,
 
   web: z => `
     <p class="kicker">${z.lang} · ${z.name}</p>
     <h2>The metro, long after the last train</h2>
     <p>Emergency lamps flicker in the tunnels. Here the "language" is the page itself: HTML for the structure, CSS for the light, JavaScript for the movement.</p>
-    <p><span class="soon">next: live HTML/CSS/JS editor</span></p>
-    <p class="note">Plan: edit CSS variables and watch the tunnel lamps and alarms react in an isolated sandbox.</p>`,
+    <div class="term">
+      <div class="term-bar"><span id="mt-tabs"><button class="mt-tab on" data-t="html">HTML</button><button class="mt-tab" data-t="css">CSS</button><button class="mt-tab" data-t="js">JS</button></span><span id="mt-status">live</span></div>
+      <textarea id="mt-code" spellcheck="false" aria-label="Code editor"></textarea>
+      <iframe id="mt-frame" sandbox="allow-scripts" title="Live preview" style="width:100%;height:190px;border:0;border-top:1px solid var(--line);background:#0b0d0c"></iframe>
+    </div>
+    <div class="row"><button class="btn ghost" id="mt-reset">Reset code</button></div>
+    <h3>What you can control</h3>
+    <p>Your code runs in an isolated sandbox. It can talk to the tunnel through <code>metro</code>:</p>
+    <ul>
+      <li><code>metro.color("#7fd1ff")</code> sets the lamp colour</li>
+      <li><code>metro.power(0.2)</code> dims or boosts the lamps (0 to 1.5)</li>
+      <li><code>metro.alarm(true)</code> starts the red alarm</li>
+    </ul>
+    <p class="note">Edit anything: the preview updates as you type, and the real tunnel behind this panel reacts.</p>`,
 
   sql: z => `
     <p class="kicker">${z.lang} · ${z.name}</p>
@@ -805,6 +837,7 @@ for n in range(3):
     <p class="note">Real SQLite running in your browser (WebAssembly). The sprites on the left are rebuilt from the table after every query.</p>`,
 };
 
+let zoneCleanup = null;
 const ZONE_INIT = {
   python() {
     const run = $('#py-run'), status = $('#py-status'), out = $('#py-out'), code = $('#py-code');
@@ -827,13 +860,92 @@ const ZONE_INIT = {
       };
     }).catch(() => {
       status.textContent = 'failed to load';
-      out.textContent = 'Could not load the Python runtime (needs internet access to cdn.jsdelivr.net).';
+      out.textContent = 'Could not load the Python runtime (assets/vendor/pyodide failed to load).';
     });
+  },
+  web() {
+    const START = {
+      html: `<div class="panel">\n  <div class="lamp" id="lamp"></div>\n  <p id="msg">Tunnel 7 \u2014 power nominal</p>\n  <button id="alarm">Trigger alarm</button>\n  <input id="hue" type="range" min="0" max="360" value="35">\n</div>`,
+      css: `body { margin: 0; display: grid; place-items: center; height: 100vh;\n       background: #0b0d0c; color: #cfc9b7; font: 14px monospace; }\n.panel { text-align: center; }\n.lamp { width: 54px; height: 54px; margin: 0 auto 10px; border-radius: 50%;\n        background: var(--c, #ffcd78); box-shadow: 0 0 30px var(--c, #ffcd78); }\nbutton { background: none; color: inherit; border: 1px solid #777; padding: 6px 14px; cursor: pointer; }\ninput { display: block; margin: 12px auto 0; width: 70%; }`,
+      js: `let on = false;\nconst lamp = document.getElementById('lamp');\nfunction setHue(h) {\n  const c = 'hsl(' + h + ' 90% 65%)';\n  lamp.style.setProperty('--c', c);\n  metro.color(c);               // the tunnel lamps follow\n}\ndocument.getElementById('hue').oninput = e => setHue(e.target.value);\ndocument.getElementById('alarm').onclick = () => {\n  on = !on;\n  metro.alarm(on);              // red alarm in the real tunnel\n  document.getElementById('msg').textContent = on ? 'ALARM \u2014 evacuate' : 'Tunnel 7 \u2014 power nominal';\n};`,
+    };
+    let src = { ...START }, tab = 'html';
+    const ta = $('#mt-code'), fr = $('#mt-frame'), stat = $('#mt-status');
+    const BRIDGE = `<script>const metro={color:c=>parent.postMessage({metro:'color',v:String(c)},'*'),power:p=>parent.postMessage({metro:'power',v:+p},'*'),alarm:a=>parent.postMessage({metro:'alarm',v:!!a},'*')};window.onerror=m=>parent.postMessage({metro:'error',v:String(m)},'*');<\/script>`;
+    const build = () => {
+      stat.textContent = 'live'; worldAPI.reset(); state.lights = true;
+      fr.srcdoc = `<!doctype html><meta charset="utf-8"><style>${src.css}</style>${src.html}${BRIDGE}<script>try{${src.js}\n}catch(e){parent.postMessage({metro:'error',v:String(e)},'*')}<\/script>`;
+    };
+    const show = () => { ta.value = src[tab]; document.querySelectorAll('.mt-tab').forEach(b => b.classList.toggle('on', b.dataset.t === tab)); };
+    let timer = 0;
+    ta.addEventListener('input', () => { src[tab] = ta.value; clearTimeout(timer); timer = setTimeout(build, 350); });
+    ta.addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); } });
+    $('#mt-tabs').addEventListener('click', e => { if (e.target.dataset.t) { tab = e.target.dataset.t; show(); } });
+    $('#mt-reset').addEventListener('click', () => { src = { ...START }; show(); build(); });
+    const onMsg = e => {
+      if (e.source !== fr.contentWindow || !e.data || typeof e.data !== 'object') return;
+      const { metro: k, v } = e.data;
+      if (k === 'color') {                                  // resolve any CSS colour through a canvas
+        const c = document.createElement('canvas').getContext('2d'); c.fillStyle = '#ffcd78'; c.fillStyle = v; c.fillRect(0, 0, 1, 1);
+        const d = c.getImageData(0, 0, 1, 1).data; state.lamp = [d[0], d[1], d[2]];
+      } else if (k === 'power') state.power = clamp(Number(v) || 0, 0, 1.5);
+      else if (k === 'alarm') state.alarm = !!v;
+      else if (k === 'error') stat.textContent = 'error: ' + String(v).slice(0, 80);
+    };
+    window.addEventListener('message', onMsg);
+    state.lights = true; show(); build();
+    zoneCleanup = () => { window.removeEventListener('message', onMsg); worldAPI.reset(); };
   },
   csharp() {
     const r = $('#snow-range'), v = $('#snow-val');
     r.addEventListener('input', () => { state.snow = r.value / 100; v.textContent = r.value + '%'; });
+    const START = `using System;
+
+class Lantern
+{
+    static void Main()
+    {
+        Console.WriteLine("The lantern is dark...");
+        for (int i = 1; i <= 3; i++)
+        {
+            Console.WriteLine($"Spark {i}");
+        }
+        World.Lights(true);
+        World.Time("dusk");
+        Console.WriteLine("Lantern lit.");
+    }
+}`;
+    const ta = $('#cs-code'), out = $('#cs-out'), run = $('#cs-run'), stat = $('#cs-status');
+    ta.value = START;
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('    ', ta.selectionStart, ta.selectionEnd, 'end'); }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run.click(); }
+    });
+    const write = (s, cls) => { const sp = document.createElement('span'); if (cls) sp.className = cls; sp.textContent = s + '\n'; out.append(sp); out.scrollTop = out.scrollHeight; };
+    let worker = null, timer = 0;
+    const stop = () => { clearTimeout(timer); if (worker) { worker.terminate(); worker = null; } run.disabled = false; };
+    zoneCleanup = stop;
+    run.onclick = () => {
+      stop(); out.textContent = '';
+      const c = CSharp.compile(ta.value);
+      if (c.error) { write(c.error, 'err'); stat.textContent = 'compile error'; return; }
+      stat.textContent = 'running…'; run.disabled = true;
+      const url = URL.createObjectURL(new Blob([CSharp.RUNTIME + '\ntry {\n' + c.js + '\n} catch (e) { postMessage({ t: "err", s: (e && e.name ? e.name + ": " : "") + (e && e.message || e) }); }\nif (__line) __out(__line);\npostMessage({ t: "done" });'], { type: 'text/javascript' }));
+      worker = new Worker(url); URL.revokeObjectURL(url);
+      worker.onmessage = e => {
+        const m = e.data;
+        if (m.t === 'out') write(m.s);
+        else if (m.t === 'err') write(m.s, 'err');
+        else if (m.t === 'world') { try { if (typeof worldAPI[String(m.fn).toLowerCase()] !== 'function') throw new Error('World has no ' + m.fn + '()'); worldAPI[String(m.fn).toLowerCase()](...m.args); } catch (err) { write(String(err.message), 'err'); } }
+        else if (m.t === 'done') { stat.textContent = 'finished'; stop(); }
+      };
+      worker.onerror = e => { write('Runtime error: ' + e.message, 'err'); stat.textContent = 'error'; stop(); };
+      timer = setTimeout(() => { write('Stopped: the program ran longer than 4 seconds (infinite loop?).', 'err'); stat.textContent = 'timed out'; stop(); }, 4000);
+    };
+    $('#cs-reset').onclick = () => { ta.value = START; };
+    $('#cs-world').onclick = () => { worldAPI.reset(); r.value = state.snow * 100; v.textContent = Math.round(state.snow * 100) + '%'; };
   },
+
   sql() {
     const run = $('#sql-run'), reset = $('#sql-reset'), status = $('#sql-status'), out = $('#sql-out'), code = $('#sql-code');
     code.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run.click(); } });
@@ -924,7 +1036,7 @@ function syncFromDb() {
 let pyPromise = null;
 function loadPyodideOnce() {
   if (pyPromise) return pyPromise;
-  const V = 'v0.26.4', base = `https://cdn.jsdelivr.net/pyodide/${V}/full/`;
+  const base = new URL('assets/vendor/pyodide/', location.href).href;   // Pyodide 0.26.4, vendored: no CDN needed
   pyPromise = new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = base + 'pyodide.js'; s.onload = res; s.onerror = rej;
