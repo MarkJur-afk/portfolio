@@ -708,7 +708,7 @@ const SECTIONS = {
     <div class="cards">
       <a class="card" href="https://github.com/MarkJur-afk/FunktsUurimine" target="_blank" rel="noopener"><b>FunktsUurimine</b><p>A web app that investigates a mathematical function: type a formula like <code>x^2-6*x+9</code> and get its derivative, zeros, extrema and a plotted graph.</p><small>C# · ASP.NET Core MVC (.NET 8) · SQLite</small></a>
       <a class="card" href="https://github.com/MarkJur-afk/JWT-Mini-API" target="_blank" rel="noopener"><b>JWT Mini-API</b><p>A small learning API that shows how token authentication works: log in, get a signed token, reach protected endpoints, and see 401 and 403 for the wrong visitors.</p><small>Python · Flask · PyJWT</small></a>
-      <a class="card" href="https://github.com/MarkJur-afk/CityExplorer" target="_blank" rel="noopener"><b>CityExplorer</b><p>A project about exploring a city. The full story lives in the repository.</p><small>GitHub</small></a>
+      <a class="card" href="https://github.com/MarkJur-afk/CityExplorer" target="_blank" rel="noopener"><b>CityExplorer</b><p>A cross-platform app for discovering a city's attractions: browse places by category, switch the interface language on the fly and keep your favourites saved on the device.</p><small>C# · .NET MAUI · SQLite</small></a>
     </div>`,
   skills: () => `
     <p class="kicker">Skills &amp; experience</p><h2>Territories</h2>
